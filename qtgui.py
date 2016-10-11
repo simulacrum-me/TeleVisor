@@ -8,26 +8,15 @@ Created on Mon Oct 10 10:13:49 2016
 
 import sys
 
-
 import sqlite3 as db
-import os
 
 import pickle
-
-import time
-
-
 
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QAction, QApplication, QFileDialog, QMessageBox
 from PyQt5.QtGui import QIcon
 
 import project_class
 
-
-
-        
- 
-        
 
 class Main_window(QMainWindow):
     
@@ -90,7 +79,8 @@ class Main_window(QMainWindow):
         fname = QFileDialog.getOpenFileNames(self, 'Add subject data', '',"Subject data (*.xls)")
 
         if fname[0]:
-            self.project.add_data(fname[0][0])
+            for name in fname[0]:
+                self.project.add_data(name)
                 
     def on_open(self):
         if self.project is None:
