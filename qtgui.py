@@ -4,7 +4,7 @@ Created on Mon Oct 10 10:13:49 2016
 
 @author: Simulacrum
 """
-
+import numpy as np
 
 import sys
 
@@ -12,9 +12,12 @@ import sqlite3 as db
 
 import pickle
 
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QAction, QApplication, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox
 from PyQt5.QtGui import QIcon
 
+from PyQt5.QtChart import QChart, QChartView, QLineSeries
+from PyQt5.QtGui import QPolygonF, QPainter
+from PyQt5.QtCore import Qt
 import project_class
 
 
@@ -27,10 +30,21 @@ class Main_window(QMainWindow):
         self.project = None
         
     def initUI(self):               
+      
+#        self.textEdit = QTextEdit()
+#
+#        self.setCentralWidget(self.textEdit)
+        self.ncurves = 0
+        self.chart = QChart()
+        self.chart.legend().hide()
+        self.view = QChartView(self.chart)
+        self.view.setRenderHint(QPainter.Antialiasing)
+        self.setCentralWidget(self.view)
         
-        self.textEdit = QTextEdit()
-
-        self.setCentralWidget(self.textEdit)
+        
+        #npoints = 10
+        #xdata = [x * 10 / npoints for x in list(range(0, npoints))]
+        #self.add_plot(xdata, np.sin(xdata), color=Qt.red)
 
         openAction = QAction(QIcon('icons/open.png'), 'Open', self)
         openAction.setShortcut('Ctrl+O')
@@ -42,6 +56,8 @@ class Main_window(QMainWindow):
         newAction.setStatusTip("Create new project")
         newAction.triggered.connect(self.on_new)
         
+        self.plotAction = QAction(QIcon('icons/show.png'), 'Plot', self)
+        self.plotAction.triggered.connect(self.on_test)
         
         self.add_dataAction = QAction(QIcon('icons/add.png'), 'Add data', self)
         self.add_dataAction.setShortcut('Ctrl+a')
@@ -62,6 +78,7 @@ class Main_window(QMainWindow):
         fileMenu.addAction(newAction)
         fileMenu.addAction(openAction)
         fileMenu.addAction(self.add_dataAction)
+        fileMenu.addAction(self.plotAction)
         fileMenu.addAction(exitAction)
 
         toolbar = self.addToolBar('Main toolbar')
@@ -74,7 +91,11 @@ class Main_window(QMainWindow):
         self.setWindowTitle('TeleVisor')
         self.setWindowIcon(QIcon('icons/show.png')) 
         self.show()
-    
+    def on_test(self):
+        ydata = self.project.get_attribute_data(0)
+        ydata = [ydata_p[0] for ydata_p in ydata if ydata_p[0]<5000 and ydata_p[0]>0 ]
+        xdata = list(range(1,len(ydata)+1))
+        self.add_plot(xdata, ydata, color=Qt.red)
     def on_add(self):
         fname = QFileDialog.getOpenFileNames(self, 'Add subject data', '',"Subject data (*.xls)")
 
@@ -122,11 +143,39 @@ class Main_window(QMainWindow):
                 pickle.dump(self.project, f)  
             
             self.add_dataAction.setDisabled(False)
+            
+    def add_plot(self, xdata, ydata, color=None):
+        curve = QLineSeries()
+        pen = curve.pen()
+        if color is not None:
+            pen.setColor(color)
+        pen.setWidthF(.1)
+        curve.setPen(pen)
+        curve.setUseOpenGL(True)
+        curve.append(series_to_polyline(xdata, ydata))
+        self.chart.addSeries(curve)
+        self.chart.createDefaultAxes()
+        self.ncurves += 1
 
 
 
 #sh.row_values(rownum))
-        
+def series_to_polyline(xdata, ydata):
+    """Convert series data to QPolygon(F) polyline
+
+    This code is derived from PythonQwt's function named 
+    `qwt.plot_curve.series_to_polyline`"""
+    size = len(xdata)
+    polyline = QPolygonF(size)
+    pointer = polyline.data()
+    dtype, tinfo = np.float, np.finfo  # integers: = np.int, np.iinfo
+    pointer.setsize(2*polyline.size()*tinfo(dtype).dtype.itemsize)
+    memory = np.frombuffer(pointer, dtype)
+    memory[:(size-1)*2+1:2] = xdata
+    memory[1:(size-1)*2+2:2] = ydata
+    return polyline  
+                
+                
 if __name__ == '__main__':
     
     app = QApplication(sys.argv)

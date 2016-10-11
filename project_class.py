@@ -71,3 +71,11 @@ class Project_data:
         c.execute("CREATE TABLE project_data AS SELECT * FROM "+subject_name+" WHERE 1=2")
         db_con.commit() 
         db_con.close()
+    def get_attribute_data(self, subject_id):
+        db_con = db.connect(self.name+".db")
+        c = db_con.cursor()
+        c.execute("select \"HR:ECG\" from project_data where \"subject_id\" = "+str(subject_id))
+        buffer = c.fetchall()
+        db_con.commit() 
+        db_con.close()
+        return buffer
