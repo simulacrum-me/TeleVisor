@@ -120,18 +120,18 @@ class Main_window(QMainWindow):
 #                self.textEdit.setText(data)     
         
     def on_new(self):
-        project_path = QFileDialog.getSaveFileName(self, "Create project",
-                           "","TeleVisor project (*.prj)");
-        self.project = project_class.Project_data(project_path) 
+        project_path = QFileDialog.getSaveFileName(self, "Create project","","TeleVisor project (*.prj)");
+        if project_path[0]:
+            self.project = project_class.Project_data(project_path[0]) 
         
                 # Create empty database file
-        db_con = db.connect(project_path[0][:-3]+"db")
-        db_con.close()
+            db_con = db.connect(project_path[0][:-3]+"db")
+            db_con.close()
         # Write the project file
-        with open(project_path[0], 'wb') as f:
-            pickle.dump(self.project, f)  
+            with open(project_path[0], 'wb') as f:
+                pickle.dump(self.project, f)  
             
-        self.add_dataAction.setDisabled(False)
+            self.add_dataAction.setDisabled(False)
 
 
 
