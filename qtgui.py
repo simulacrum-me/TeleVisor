@@ -12,7 +12,7 @@ import sqlite3 as db
 
 import pickle
 
-from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox, QComboBox
 from PyQt5.QtGui import QIcon
 
 from PyQt5.QtChart import QChart, QChartView, QLineSeries
@@ -28,6 +28,7 @@ class Main_window(QMainWindow):
         
         self.initUI()
         self.project = None
+        self.current_project_path = ""
         
     def initUI(self):               
       
@@ -72,7 +73,7 @@ class Main_window(QMainWindow):
         exitAction.triggered.connect(self.close)
 
         self.statusBar()
-
+        self.combo_box_attribute = QComboBox()
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
         fileMenu.addAction(newAction)
@@ -85,6 +86,7 @@ class Main_window(QMainWindow):
         toolbar.addAction(newAction)
         toolbar.addAction(openAction)
         toolbar.addAction(self.add_dataAction)
+        toolbar.addWidget(self.combo_box_attribute)
         #toolbar.addAction(exitAction)
         
         self.setGeometry(300, 300, 350, 250)
@@ -92,25 +94,34 @@ class Main_window(QMainWindow):
         self.setWindowIcon(QIcon('icons/show.png')) 
         self.show()
     def on_test(self):
-        ydata = self.project.get_attribute_data(0)
-        ydata = [ydata_p[0] for ydata_p in ydata if ydata_p[0]<5000 and ydata_p[0]>0 ]
-        xdata = list(range(1,len(ydata)+1))
-        self.add_plot(xdata, ydata, color=Qt.red)
+        print(dir(self.project))
+        attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
+        for subject in self.project.subjects:
+            ydata = self.project.get_attribute_data(subject.id, attribute_name)
+            ydata = [ydata_p[0] for ydata_p in ydata]
+            xdata = list(range(1,len(ydata)+1))
+            self.add_plot(xdata, ydata, color=Qt.red)
+        
+        
     def on_add(self):
         fname = QFileDialog.getOpenFileNames(self, 'Add subject data', '',"Subject data (*.xls)")
 
         if fname[0]:
             for name in fname[0]:
                 self.project.add_data(name)
+            self.combo_box_attribute.addItems(self.project.get_attribute_names())
+            self.save_project(self.current_project_path)
                 
     def on_open(self):
         if self.project is None:
             fname = QFileDialog.getOpenFileName(self, 'Open project', '',"TeleVisor project (*.prj)")
 
             if fname[0]:
+                self.current_project_path = fname[0]
                 with open(fname[0], 'rb') as f:    
                     self.project = pickle.load(f)
                 self.add_dataAction.setDisabled(False)
+                self.combo_box_attribute.addItems(self.project.get_attribute_names())
         else:
             reply = QMessageBox.question(self, 'Warning',
             "A project is already open. Close and save it?", QMessageBox.Yes | 
@@ -134,16 +145,18 @@ class Main_window(QMainWindow):
         project_path = QFileDialog.getSaveFileName(self, "Create project","","TeleVisor project (*.prj)");
         if project_path[0]:
             self.project = project_class.Project_data(project_path[0]) 
-        
+            self.current_project_path = project_path[0]
                 # Create empty database file
             db_con = db.connect(project_path[0][:-3]+"db")
             db_con.close()
-        # Write the project file
-            with open(project_path[0], 'wb') as f:
-                pickle.dump(self.project, f)  
-            
+            # Write the project file
+            self.save_project(project_path[0])
             self.add_dataAction.setDisabled(False)
             
+    def save_project(self, path):
+        with open(path, 'wb') as f:
+                pickle.dump(self.project, f)  
+                
     def add_plot(self, xdata, ydata, color=None):
         curve = QLineSeries()
         pen = curve.pen()
