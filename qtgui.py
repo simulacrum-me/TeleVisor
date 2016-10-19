@@ -12,11 +12,11 @@ import sqlite3 as db
 
 import pickle
 
-from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox, QComboBox
+from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox, QComboBox, QListWidget, QDockWidget, QAbstractItemView  
 from PyQt5.QtGui import QIcon
 
 from PyQt5.QtChart import QChart, QChartView, QLineSeries
-from PyQt5.QtGui import QPolygonF, QPainter
+from PyQt5.QtGui import QPolygonF, QPainter, QColor
 from PyQt5.QtCore import Qt
 import project_class
 
@@ -27,6 +27,8 @@ class Main_window(QMainWindow):
         super().__init__()
         
         self.initUI()
+        
+        self.init_palette()
         self.project = None
         self.current_project_path = ""
         
@@ -35,17 +37,23 @@ class Main_window(QMainWindow):
 #        self.textEdit = QTextEdit()
 #
 #        self.setCentralWidget(self.textEdit)
+        self.subjects_listbox = QListWidget()
+        self.subjects_listbox.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.subjects_listbox.itemSelectionChanged.connect(self.on_change_subjects)
+        self.subjects_list_widget = QDockWidget("Subjects", self)
+        #self.subjects_list_widget.setObjectName("LogDockWidget")
+        self.subjects_list_widget.setAllowedAreas(Qt.LeftDockWidgetArea|
+        Qt.RightDockWidgetArea)
+        
+        self.subjects_list_widget.setWidget(self.subjects_listbox)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.subjects_list_widget)
+
         self.ncurves = 0
         self.chart = QChart()
         self.chart.legend().hide()
         self.view = QChartView(self.chart)
         self.view.setRenderHint(QPainter.Antialiasing)
         self.setCentralWidget(self.view)
-        
-        
-        #npoints = 10
-        #xdata = [x * 10 / npoints for x in list(range(0, npoints))]
-        #self.add_plot(xdata, np.sin(xdata), color=Qt.red)
 
         openAction = QAction(QIcon('icons/open.png'), 'Open', self)
         openAction.setShortcut('Ctrl+O')
@@ -89,18 +97,35 @@ class Main_window(QMainWindow):
         toolbar.addWidget(self.combo_box_attribute)
         #toolbar.addAction(exitAction)
         
-        self.setGeometry(300, 300, 350, 250)
+        self.setGeometry(200, 200, 950, 750)
         self.setWindowTitle('TeleVisor')
         self.setWindowIcon(QIcon('icons/show.png')) 
         self.show()
+        
     def on_test(self):
-        print(dir(self.project))
+        
         attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
+        color_warm_id = 0
         for subject in self.project.subjects:
             ydata = self.project.get_attribute_data(subject.id, attribute_name)
             ydata = [ydata_p[0] for ydata_p in ydata]
             xdata = list(range(1,len(ydata)+1))
-            self.add_plot(xdata, ydata, color=Qt.red)
+            self.add_plot(xdata, ydata, color=self.warm_palette[color_warm_id])
+            color_warm_id += 1
+        
+    def on_change_subjects(self):
+        subjects_selected = [item.text() for item in self.subjects_listbox.selectedItems()]
+        print(subjects_selected)
+        selected_subjects_ids = [subject.id for subject in self.project.subjects if subject.name in subjects_selected]
+        color_warm_id = 0
+        attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
+        self.chart.removeAllSeries()
+        for subject_id in selected_subjects_ids:
+            ydata = self.project.get_attribute_data(subject_id, attribute_name)
+            ydata = [ydata_p[0] for ydata_p in ydata]
+            xdata = list(range(1,len(ydata)+1))
+            self.add_plot(xdata, ydata, color=self.warm_palette[color_warm_id])
+            color_warm_id += 1
         
         
     def on_add(self):
@@ -110,16 +135,16 @@ class Main_window(QMainWindow):
             for name in fname[0]:
                 self.project.add_data(name)
             self.combo_box_attribute.addItems(self.project.get_attribute_names())
+            self.update_subjects_listbox()   
             self.save_project(self.current_project_path)
-                
+            
     def on_open(self):
         if self.project is None:
             fname = QFileDialog.getOpenFileName(self, 'Open project', '',"TeleVisor project (*.prj)")
 
             if fname[0]:
                 self.current_project_path = fname[0]
-                with open(fname[0], 'rb') as f:    
-                    self.project = pickle.load(f)
+                self.load_project(self.current_project_path)
                 self.add_dataAction.setDisabled(False)
                 self.combo_box_attribute.addItems(self.project.get_attribute_names())
         else:
@@ -156,7 +181,12 @@ class Main_window(QMainWindow):
     def save_project(self, path):
         with open(path, 'wb') as f:
                 pickle.dump(self.project, f)  
-                
+    
+    def load_project(self, path):
+        with open(path, 'rb') as f:    
+                    self.project = pickle.load(f)
+                    self.update_subjects_listbox()
+                    
     def add_plot(self, xdata, ydata, color=None):
         curve = QLineSeries()
         pen = curve.pen()
@@ -169,8 +199,12 @@ class Main_window(QMainWindow):
         self.chart.addSeries(curve)
         self.chart.createDefaultAxes()
         self.ncurves += 1
-
-
+    def update_subjects_listbox(self):
+        self.subjects_listbox.clear()
+        self.subjects_listbox.addItems(self.project.get_subjects_names())
+    def init_palette(self):
+        self.warm_palette = [QColor(255,171,0),QColor(255,127,0),QColor(255,55,1),QColor(211,1,76),QColor(168,0,109)]
+        self.cold_palette = [QColor(183,210,211),QColor(109,169,195),QColor(42,104,141),QColor(38,63,93),QColor(19,31,45)]
 
 #sh.row_values(rownum))
 def series_to_polyline(xdata, ydata):

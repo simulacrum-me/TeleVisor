@@ -97,4 +97,9 @@ class Project_data:
         c.execute("DELETE FROM "+subject_name+" WHERE `HR:ECG` >= 9999900414574590")
         db_con.commit() 
         db_con.close()
-    
+        
+    def get_subjects_names(self):
+        try:
+            return [subject.name for subject in self.subjects]
+        except AttributeError:
+            return []
