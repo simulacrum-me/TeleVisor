@@ -8,7 +8,9 @@ import numpy as np
 
 import sys
 
-import sqlite3 as db
+import pyqtgraph
+
+
 
 import pickle
 
@@ -36,14 +38,12 @@ class Main_window(QMainWindow):
         
     def initUI(self):               
       
-#        self.textEdit = QTextEdit()
-#
-#        self.setCentralWidget(self.textEdit)
+
         self.subjects_listbox = QListWidget()
         self.subjects_listbox.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.subjects_listbox.itemSelectionChanged.connect(self.on_change_subjects)
         self.subjects_list_widget = QDockWidget("Subjects", self)
-        #self.subjects_list_widget.setObjectName("LogDockWidget")
+    
         self.subjects_list_widget.setAllowedAreas(Qt.LeftDockWidgetArea|
         Qt.RightDockWidgetArea)
         
@@ -51,11 +51,11 @@ class Main_window(QMainWindow):
         self.addDockWidget(Qt.LeftDockWidgetArea, self.subjects_list_widget)
 
         self.ncurves = 0
-        self.chart = QChart()
-        self.chart.legend().hide()
-        self.view = QChartView(self.chart)
-        self.view.setRenderHint(QPainter.Antialiasing)
-        self.setCentralWidget(self.view)
+        
+
+        self.main_plot = pyqtgraph.PlotWidget()
+        self.setCentralWidget(self.main_plot)    
+        
 
         openAction = QAction(QIcon('icons/open.png'), 'Open', self)
         openAction.setShortcut('Ctrl+O')
@@ -108,35 +108,34 @@ class Main_window(QMainWindow):
         self.setWindowIcon(QIcon('icons/show.png')) 
         self.show()
         
-    def on_test(self):
-        
-        attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
-        color_warm_id = 0
-        for subject in self.project.subjects:
-            ydata = self.project.get_attribute_data(subject.id, attribute_name)
-            ydata = [ydata_p[0] for ydata_p in ydata]
-            xdata = list(range(1,len(ydata)+1))
-            self.add_plot(xdata, ydata, color=self.warm_palette[color_warm_id])
-            color_warm_id += 1
+    def on_test(self):        
+        pass
         
     def on_change_subjects(self):
-        subjects_selected = [item.text() for item in self.subjects_listbox.selectedItems()]
-        print(subjects_selected)
-        selected_subjects_ids = [subject.id for subject in self.project.subjects if subject.name in subjects_selected]
-        color_warm_id = 0
-        attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
-        self.chart.removeAllSeries()
-        for subject_id in selected_subjects_ids:
-            ydata = self.project.get_attribute_data(subject_id, attribute_name)
-            ydata = [ydata_p[0] for ydata_p in ydata]
-            xdata = list(range(1,len(ydata)+1))
-            self.add_plot(xdata, ydata, color=self.warm_palette[color_warm_id])
-            color_warm_id += 1
+        self.update_plot()
+        
     def on_project_settings(self):
          dialog = project_settings_dialog()
          dialog.exec()
-
-        
+         
+    def update_plot(self):
+        try:
+            subjects_selected = [item.text() for item in self.subjects_listbox.selectedItems()]
+            selected_subjects_ids = [subject.id for subject in self.project.subjects if subject.name in subjects_selected]
+            attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
+            
+            self.main_plot.clear()
+            for subject_id in selected_subjects_ids:
+                ydata = self.project.get_attribute_data(subject_id, attribute_name)
+                #ydata = [ydata_p[0] for ydata_p in ydata]
+                xdata = list(range(1,len(ydata)+1))
+                
+                self.main_plot.plot(xdata, ydata, pen=1)
+        except TypeError:
+            self.main_plot.clear()
+            #self.main_plot.getAxis("bottom").setLogMode(True)
+            #self.main_plot.hideAxis("bottom")
+            
     def on_add(self):
         fname = QFileDialog.getOpenFileNames(self, 'Add subject data', '',"Subject data (*.xls)")
 
@@ -166,23 +165,13 @@ class Main_window(QMainWindow):
                 self.project = None
                 self.on_open()
             else:
-                pass
-            #csv_from_excel(fname[0][0])
-#            f = open(fname[0][0], 'r') # Opens first file only
-#
-#            with f:
-#                
-#                data = f.read()
-#                self.textEdit.setText(data)     
+                pass    
         
     def on_new(self):
         project_path = QFileDialog.getSaveFileName(self, "Create project","","TeleVisor project (*.prj)");
         if project_path[0]:
             self.project = project_class.Project_data(project_path[0]) 
             self.current_project_path = project_path[0]
-                # Create empty database file
-            db_con = db.connect(project_path[0][:-3]+"db")
-            db_con.close()
             # Write the project file
             self.save_project(project_path[0])
             self.add_dataAction.setDisabled(False)
@@ -196,42 +185,14 @@ class Main_window(QMainWindow):
                     self.project = pickle.load(f)
                     self.update_subjects_listbox()
                     
-    def add_plot(self, xdata, ydata, color=None):
-        curve = QLineSeries()
-        pen = curve.pen()
-        if color is not None:
-            pen.setColor(color)
-        pen.setWidthF(.1)
-        curve.setPen(pen)
-        curve.setUseOpenGL(True)
-        curve.append(series_to_polyline(xdata, ydata))
-        self.chart.addSeries(curve)
-        self.chart.createDefaultAxes()
-        self.ncurves += 1
     def update_subjects_listbox(self):
         self.subjects_listbox.clear()
         self.subjects_listbox.addItems(self.project.get_subjects_names())
+        
     def init_palette(self):
         self.warm_palette = [QColor(255,171,0),QColor(255,127,0),QColor(255,55,1),QColor(211,1,76),QColor(168,0,109)]
         self.cold_palette = [QColor(183,210,211),QColor(109,169,195),QColor(42,104,141),QColor(38,63,93),QColor(19,31,45)]
-
-#sh.row_values(rownum))
-def series_to_polyline(xdata, ydata):
-    """Convert series data to QPolygon(F) polyline
-
-    This code is derived from PythonQwt's function named 
-    `qwt.plot_curve.series_to_polyline`"""
-    size = len(xdata)
-    polyline = QPolygonF(size)
-    pointer = polyline.data()
-    dtype, tinfo = np.float, np.finfo  # integers: = np.int, np.iinfo
-    pointer.setsize(2*polyline.size()*tinfo(dtype).dtype.itemsize)
-    memory = np.frombuffer(pointer, dtype)
-    memory[:(size-1)*2+1:2] = xdata
-    memory[1:(size-1)*2+2:2] = ydata
-    return polyline  
-                
-                
+            
 if __name__ == '__main__':
     
     app = QApplication(sys.argv)
