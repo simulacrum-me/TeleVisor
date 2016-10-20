@@ -12,13 +12,15 @@ import sqlite3 as db
 
 import pickle
 
-from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox, QComboBox, QListWidget, QDockWidget, QAbstractItemView  
+from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox, QComboBox, QListWidget, QDockWidget, QAbstractItemView, QDialog, QPushButton  
 from PyQt5.QtGui import QIcon
 
 from PyQt5.QtChart import QChart, QChartView, QLineSeries
 from PyQt5.QtGui import QPolygonF, QPainter, QColor
 from PyQt5.QtCore import Qt
+
 import project_class
+from project_settings_dialog import project_settings_dialog
 
 
 class Main_window(QMainWindow):
@@ -68,6 +70,9 @@ class Main_window(QMainWindow):
         self.plotAction = QAction(QIcon('icons/show.png'), 'Plot', self)
         self.plotAction.triggered.connect(self.on_test)
         
+        self.settingsAction = QAction(QIcon('icons/settings.png'), 'Project settings', self)
+        self.settingsAction.triggered.connect(self.on_project_settings)
+        
         self.add_dataAction = QAction(QIcon('icons/add.png'), 'Add data', self)
         self.add_dataAction.setShortcut('Ctrl+a')
         self.add_dataAction.setStatusTip('Add data')
@@ -94,6 +99,7 @@ class Main_window(QMainWindow):
         toolbar.addAction(newAction)
         toolbar.addAction(openAction)
         toolbar.addAction(self.add_dataAction)
+        toolbar.addAction(self.settingsAction)
         toolbar.addWidget(self.combo_box_attribute)
         #toolbar.addAction(exitAction)
         
@@ -126,7 +132,10 @@ class Main_window(QMainWindow):
             xdata = list(range(1,len(ydata)+1))
             self.add_plot(xdata, ydata, color=self.warm_palette[color_warm_id])
             color_warm_id += 1
-        
+    def on_project_settings(self):
+         dialog = project_settings_dialog()
+         dialog.exec()
+
         
     def on_add(self):
         fname = QFileDialog.getOpenFileNames(self, 'Add subject data', '',"Subject data (*.xls)")
