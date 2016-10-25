@@ -4,7 +4,7 @@ Created on Mon Oct 10 10:13:49 2016
 
 @author: Simulacrum
 """
-import numpy as np
+
 
 import sys
 
@@ -17,11 +17,12 @@ import pickle
 from PyQt5.QtWidgets import QMainWindow, QAction, QApplication, QFileDialog, QMessageBox, QComboBox, QListWidget, QDockWidget, QAbstractItemView, QDialog, QPushButton  
 from PyQt5.QtGui import QIcon
 
-from PyQt5.QtChart import QChart, QChartView, QLineSeries
-from PyQt5.QtGui import QPolygonF, QPainter, QColor
+from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
 
 import project_class
+
+from stats_widget import stats_dialog
 from project_settings_dialog import project_settings_dialog
 
 
@@ -34,6 +35,7 @@ class Main_window(QMainWindow):
         
         self.init_palette()
         self.project = None
+        self.averaging = False
         self.current_project_path = ""
         
     def initUI(self):               
@@ -49,7 +51,14 @@ class Main_window(QMainWindow):
         
         self.subjects_list_widget.setWidget(self.subjects_listbox)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.subjects_list_widget)
-
+        
+        self.stats_dialog = stats_dialog()
+        self.stats_widget = QDockWidget("Statistics", self)
+        self.stats_widget.setAllowedAreas(Qt.LeftDockWidgetArea|
+        Qt.RightDockWidgetArea)
+        self.stats_widget.setWidget(self.stats_dialog)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.stats_widget)
+        
         self.ncurves = 0
         
 
@@ -79,11 +88,18 @@ class Main_window(QMainWindow):
         self.add_dataAction.triggered.connect(self.on_add)
         self.add_dataAction.setDisabled(True)
         
+        self.averageAction = QAction(QIcon('icons/average.png'), 'Average signal', self)
+        self.averageAction.triggered.connect(self.on_average)
+        
+        self.aboutAction =  QAction(QIcon('icons/average.png'), 'About TeleVisor...', self)
+        self.aboutAction.triggered.connect(self.on_about)
         
         exitAction = QAction(QIcon('icons/exit.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.setStatusTip('Show Graph')
         exitAction.triggered.connect(self.close)
+        
+        
 
         self.statusBar()
         self.combo_box_attribute = QComboBox()
@@ -94,12 +110,15 @@ class Main_window(QMainWindow):
         fileMenu.addAction(self.add_dataAction)
         fileMenu.addAction(self.plotAction)
         fileMenu.addAction(exitAction)
+        helpMenu = menubar.addMenu('&Help')
+        helpMenu.addAction(self.aboutAction)
 
         toolbar = self.addToolBar('Main toolbar')
         toolbar.addAction(newAction)
         toolbar.addAction(openAction)
         toolbar.addAction(self.add_dataAction)
         toolbar.addAction(self.settingsAction)
+        toolbar.addAction(self.averageAction)
         toolbar.addWidget(self.combo_box_attribute)
         #toolbar.addAction(exitAction)
         
@@ -107,32 +126,88 @@ class Main_window(QMainWindow):
         self.setWindowTitle('TeleVisor')
         self.setWindowIcon(QIcon('icons/show.png')) 
         self.show()
+     
         
+    def on_about(self):
+        self.stats_dialog.average=1
+        self.stats_dialog.update()
+        QMessageBox.about(self,"About TeleVisor","TeleVisor 0.56 \n\nDeveloped by Dmitry Kamaev\n\nkdsw@yandex.ru")
     def on_test(self):        
         pass
-        
+    def on_average(self):
+        if self.averaging == False:
+            self.averaging = True
+        else:
+            self.averaging = False
+        self.update_plot()
     def on_change_subjects(self):
         self.update_plot()
         
     def on_project_settings(self):
-         dialog = project_settings_dialog()
-         dialog.exec()
+        group1_list = self.project.get_subjects_names_by_group_id(0)
+        group2_list = self.project.get_subjects_names_by_group_id(1)
+        dialog = project_settings_dialog(group1_list, group2_list)
+        if dialog.exec():
+            self.project.update_groups(dialog.group1_list,dialog. group2_list)
+            self.update_plot()
          
     def update_plot(self):
         try:
+            cold_color_counter = 0
+            warm_color_counter = 0
             subjects_selected = [item.text() for item in self.subjects_listbox.selectedItems()]
-            selected_subjects_ids = [subject.id for subject in self.project.subjects if subject.name in subjects_selected]
+            selected_subjects_ids = self.project.subjects_names_to_id(subjects_selected)
             attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
             
+            
             self.main_plot.clear()
+            
+            
             for subject_id in selected_subjects_ids:
                 ydata = self.project.get_attribute_data(subject_id, attribute_name)
-                #ydata = [ydata_p[0] for ydata_p in ydata]
-                xdata = list(range(1,len(ydata)+1))
+                xdata = self.project.get_attribute_data(subject_id, '_time')
                 
-                self.main_plot.plot(xdata, ydata, pen=1)
+                group = self.project.get_group_by_subject_id(subject_id)
+                if group == 0:
+                    plot_pen = pyqtgraph.mkPen(self.warm_palette[warm_color_counter])
+                    warm_color_counter += 1
+                elif group == 1:
+                    plot_pen = pyqtgraph.mkPen(self.cold_palette[cold_color_counter])
+                    cold_color_counter += 1
+                            
+                self.main_plot.plot(xdata, ydata, pen=plot_pen, name = self.project.get_subject_name_by_id(subject_id))
+                
         except TypeError:
             self.main_plot.clear()
+        if self.averaging == True:
+            try:
+                cold_color_counter = 0
+                warm_color_counter = 0
+                subjects_selected = [item.text() for item in self.subjects_listbox.selectedItems()]
+                selected_subjects_ids = self.project.subjects_names_to_id(subjects_selected)
+                attribute_name = self.project.get_attribute_names()[self.combo_box_attribute.currentIndex()]
+                
+                self.main_plot.clear()
+                
+                for subject_id in selected_subjects_ids:
+                    ydata = self.project.get_averaged_attribute_data(subject_id, attribute_name)[0]
+                    xdata = self.project.get_averaged_attribute_data(subject_id, attribute_name)[1]
+                    
+                    group = self.project.get_group_by_subject_id(subject_id)
+                    if group == 0:
+                        plot_pen = pyqtgraph.mkPen(self.warm_palette[warm_color_counter])
+                        plot_brush = pyqtgraph.mkBrush(self.warm_palette[warm_color_counter])
+                        warm_color_counter += 1
+                    elif group == 1:
+                        plot_pen = pyqtgraph.mkPen(self.cold_palette[cold_color_counter])
+                        plot_brush = pyqtgraph.mkBrush(self.cold_palette[cold_color_counter])
+                        cold_color_counter += 1
+                                
+                    self.main_plot.plot(xdata, ydata, pen=plot_pen,symbol = 'o',symbolBrush = plot_brush)
+                    
+            except TypeError:
+                self.main_plot.clear()
+            
             #self.main_plot.getAxis("bottom").setLogMode(True)
             #self.main_plot.hideAxis("bottom")
             
