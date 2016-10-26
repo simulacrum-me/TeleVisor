@@ -10,8 +10,14 @@ from PyQt5.QtGui import QIcon
 class stats_dialog(QDialog):
     def __init__(self,):
         super().__init__()
-        self.average = 0
+        self.selected_average = 0
+        self.selected_sd = 0
         
+        self.gr1_average = 0
+        self.gr1_sd = 0
+        
+        self.gr2_average = 0
+        self.gr2_sd = 0
         self.initUI()
         
     def initUI(self):
@@ -26,8 +32,14 @@ class stats_dialog(QDialog):
         
         
         
-        self.average_label = QLabel()
-        self.average_label.setText(str(self.average))
+        self.average_label = QLabel(text = str(self.selected_average))
+        self.sd_label = QLabel(text = str(self.selected_sd))
+        
+        self.gr1_average_label = QLabel(text = str(self.gr1_average))
+        self.gr1_sd_label = QLabel(text = str(self.gr1_sd))
+        
+        self.gr2_average_label = QLabel(text = str(self.gr2_average))
+        self.gr2_sd_label = QLabel(text = str(self.gr2_sd))
         
         self.grid.addWidget(QLabel(text = "Selected average:"),1,1)
         self.grid.addWidget(QLabel(text = "Selected SD:"),2,1)
@@ -38,11 +50,30 @@ class stats_dialog(QDialog):
         self.grid.addWidget(QLabel(text = "Selected group 2 average:"),5,1)
         self.grid.addWidget(QLabel(text = "Selected group 2 SD:"),6,1)
         
+        
+        
         self.grid.addWidget(self.average_label,1,2)
+        self.grid.addWidget(self.sd_label,2,2)
+        
+        self.grid.addWidget(self.gr1_average_label,3,2)
+        self.grid.addWidget(self.gr1_sd_label,4,2)
+        
+        self.grid.addWidget(self.gr2_average_label,5,2)
+        self.grid.addWidget(self.gr2_sd_label,6,2)
+        
+        
         
         self.setLayout(self.grid)
     def update(self):
-        self.average_label.setText(str(self.average))
+        
+        self.average_label.setText(str(self.selected_average))
+        self.sd_label.setText(str(self.selected_sd))
+        
+        self.gr1_average_label.setText(str(self.gr1_average))
+        self.gr1_sd_label.setText(str(self.gr1_sd))
+        
+        self.gr2_average_label.setText(str(self.gr2_average))
+        self.gr2_sd_label.setText(str(self.gr2_sd))
         
         
         

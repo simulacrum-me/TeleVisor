@@ -19,6 +19,7 @@ class Project_data:
     def __init__(self, project_path):
               
         self.name = project_path.rsplit(sep="/",maxsplit=1)[1][:-4]
+        self.averaging_period = 2
         
     def add_data(self, file_name):        
         self.csv_from_excel(file_name)
@@ -68,7 +69,7 @@ class Project_data:
     def get_averaged_attribute_data(self, subject_id, attribute_name):
         xdata = []
         ydata = []
-        averaging_period = 60*60*12 
+        averaging_period = 60*60*self.averaging_period
         
         min_time = min(self.get_attribute_data(subject_id, '_time'))
         max_time = max(self.get_attribute_data(subject_id, '_time'))
@@ -85,7 +86,32 @@ class Project_data:
             ydata.append(y)
             xdata.append(start_time+interval*averaging_period + 0.5 * averaging_period)                 
         
+        return (ydata,xdata)
         
+    def get_averaged_group_attribute_data(self, subjects, attribute_name):
+        xdata = []
+        ydata = []
+        averaging_period = 60*60*self.averaging_period
+        if len(subjects)==1:
+            subject_condition = (self.project_df['_subject_id'] == subjects[0])
+        else: 
+            subject_condition = (self.project_df['_subject_id'] == subjects[0])
+            for subject_id in subjects:
+                subject_condition = subject_condition | (self.project_df['_subject_id'] == subject_id)
+        min_time = min(self.project_df['_time'][subject_condition].tolist())
+        max_time = max(self.project_df['_time'][subject_condition].tolist())
+        seconds_since_day_began = min_time % (60*60*24)
+        seconds_before_day_began = min_time - seconds_since_day_began
+        num_tperiods_to_data = seconds_since_day_began // averaging_period
+        
+        start_time = seconds_before_day_began + num_tperiods_to_data * averaging_period
+        n_intervals = (max_time - start_time) // averaging_period + 1
+        
+        for interval in range(n_intervals):
+            y = self.project_df[attribute_name][(subject_condition) & (self.project_df['_time']>= (start_time+interval*averaging_period)) &  (self.project_df['_time']<= (start_time+(interval+1)*averaging_period))].tolist()
+            y = np.average(y)   
+            ydata.append(y)
+            xdata.append(start_time+interval*averaging_period + 0.5 * averaging_period)
         
         return (ydata,xdata)
         
